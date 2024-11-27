@@ -42,37 +42,29 @@ def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
     return pd.DataFrame(extracted_data)
 
 
-def process_and_combine_files(folder_path, output_csv, peak_table='Ch1'):
-    all_data = []  # To store extracted data from all files
+def process_and_separate_files(folder_path, output_csv, peak_table='Ch1'):
+    with open(output_csv, 'w') as output_file:
+        # Write combined data with separators
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
 
-    # Iterate over all files in the folder
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
+            # Process files with .txt or .TXT extensions
+            if os.path.isfile(file_path) and filename.lower().endswith('.txt'):
+                print(f"Processing {filename}...")
+                df = extract_and_validate_peak_table(file_path, peak_table)
 
-        # Process files with .txt or .TXT extensions
-        if os.path.isfile(file_path) and filename.lower().endswith('.txt'):
-            print(f"Processing {filename}...")
-            df = extract_and_validate_peak_table(file_path, peak_table)
+                if not df.empty:
+                    # Add a separator row with the file name
+                    output_file.write(f"Source File: {filename}\n")
+                    df.to_csv(output_file, index=False)
+                    output_file.write("\n")  # Add an empty line as a separator
 
-            # Add a title column with the file name for context
-            if not df.empty:
-                df['Source File'] = filename
-                all_data.append(df)
-
-    # Combine all extracted data into a single DataFrame
-    if all_data:
-        combined_df = pd.concat(all_data, ignore_index=True)
-        combined_df.to_csv(output_csv, index=False)
-        print(f"Combined data saved to {output_csv}")
-        return combined_df
-    else:
-        print("No data extracted from the files.")
-        return pd.DataFrame()
+    print(f"Combined data with file separators saved to {output_csv}")
 
 
 if __name__ == "__main__":
     folder_path = input("Enter the folder path containing the files: ").strip()
-    output_csv = os.path.join(folder_path, "combined_output.csv")  # Output CSV in the same folder
+    output_csv = os.path.join(folder_path, "combined_output_with_separators.csv")  # Output CSV
     peak_table = input("Enter the peak table identifier (default 'Ch1'): ").strip() or 'Ch1'
 
-    process_and_combine_files(folder_path, output_csv, peak_table)
+    process_and_separate_files(folder_path, output_csv, peak_table)
