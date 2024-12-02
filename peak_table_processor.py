@@ -5,6 +5,9 @@ from tkinter.filedialog import askdirectory
 
 
 def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
+    """
+    Extracts the R.Time, Area, and Height columns from the specified peak table section in a file.
+    """
     # Read file contents
     with open(file_path, 'r', encoding='ISO-8859-1') as file:
         lines = file.readlines()
@@ -42,6 +45,10 @@ def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
 
 
 def process_and_separate_files(folder_path, output_csv, peak_table='Ch1'):
+    """
+    Processes all .txt or .TXT files in a folder and writes the combined data to a CSV
+    with each file's data separated by a title row.
+    """
     with open(output_csv, 'w') as output_file:
         # Write combined data with separators
         for filename in os.listdir(folder_path):
@@ -61,12 +68,19 @@ def process_and_separate_files(folder_path, output_csv, peak_table='Ch1'):
     print(f"Combined data with file separators saved to {output_csv}")
 
 
-if __name__ == "__main__":
-    # Use a GUI dialog to select the folder
+def select_folder():
+    """
+    Opens a dialog for the user to select a folder and returns the selected path.
+    """
     print("Select the folder containing the files.")
     Tk().withdraw()  # Hide the root window
     folder_path = askdirectory(title="Select Folder")
+    return folder_path
 
+
+if __name__ == "__main__":
+    # Interactive folder selection
+    folder_path = select_folder()
     if not folder_path:
         print("No folder selected. Exiting.")
     else:
