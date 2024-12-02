@@ -1,32 +1,41 @@
 import os
-from natural_sort_processor import process_and_separate_files_naturally_sorted
-from peak_table_processor import process_and_separate_files, select_folder
+from combined_processor import process_and_separate_files_naturally_sorted, process_and_filter_file
+from tkinter import Tk
+from tkinter.filedialog import askdirectory
+
+
+def select_folder():
+    root = Tk()
+    root.withdraw()  # Hide the main tkinter window
+    folder_path = askdirectory(title="Select the folder containing the files.")
+    return folder_path
+
 
 def main():
-    print("Choose a processing method:")
-    print("1: Process files in alphabetical order")
-    print("2: Process files with natural sorting (handles decimals)")
-    choice = input("Enter your choice (1 or 2): ").strip()
-
     # Step 1: Let the user select a folder
     folder_path = select_folder()
     if not folder_path:
         print("No folder selected. Exiting.")
         return
 
-    # Step 2: Set the output file location
-    output_csv = os.path.join(folder_path, "combined_output_with_separators.csv")
+    # Step 2: Set the output file locations
+    combined_output_csv = os.path.join(folder_path, "combined_output_with_separators.csv")
+    filtered_output_csv = os.path.join(folder_path, "filtered_output.csv")
 
-    # Step 3: Ask for the peak table identifier
-    peak_table = input("Enter the peak table identifier (default 'Ch1'): ").strip() or 'Ch1'
+    # Step 3: Set the peak table identifier
+    peak_table = 'Ch1'
 
-    # Step 4: Process based on the user's choice
-    if choice == "1":
-        process_and_separate_files(folder_path, output_csv, peak_table)
-    elif choice == "2":
-        process_and_separate_files_naturally_sorted(folder_path, output_csv, peak_table)
-    else:
-        print("Invalid choice. Exiting.")
+    # Step 4: Automatically process with natural sorting
+    print("Processing files with natural sorting...")
+    process_and_separate_files_naturally_sorted(folder_path, combined_output_csv, peak_table)
+
+    # Step 5: Automatically filter the combined CSV
+    print(f"Generating filtered CSV based on R.Time values 1.6, 2.3, and 3.6...")
+    target_r_times = [1.6, 2.3, 3.6]
+    tolerance = 0.1  # Define the tolerance
+
+    process_and_filter_file(combined_output_csv, target_r_times, tolerance, filtered_output_csv)
+
 
 if __name__ == "__main__":
     main()
