@@ -17,12 +17,11 @@ def select_folder():
     Tk().withdraw()  # Hide the root tkinter window
     return askdirectory(title="Select the folder containing the files")
 
-
 def main():
     # Step 1: Select folder
     folder_path = select_folder()
-    if not folder_path:
-        logging.info("No folder selected. Exiting.")
+    if not folder_path or not os.path.exists(folder_path) or not os.listdir(folder_path):
+        logging.error("The selected folder does not exist or is empty. Exiting.")
         return
 
     # Step 2: Set peak table identifier
@@ -34,7 +33,7 @@ def main():
     combined_data = process_and_separate_files_naturally_sorted(folder_path, peak_table)
 
     if combined_data.empty:
-        raise ValueError("Combined data is empty or invalid. Check the input files or processing logic.")
+        raise ValueError("No valid data found in the selected files. Ensure the input files are correctly formatted.")
 
     # Step 4: Filter combined data
     logging.info("Filtering data based on R.Time values 1.6, 2.3, and 3.6...")
@@ -43,7 +42,8 @@ def main():
     filtered_data = process_and_filter_file(combined_data, target_r_times, tolerance)
 
     if filtered_data.empty:
-        raise ValueError("Filtered data is empty. Check the input files or filtering logic.")
+        raise ValueError("No matching R.Time data found after filtering. Check the target R.Time values or input data.")
+
     logging.info("Data filtered successfully.")
 
     # Step 5: Calculate concentrations
@@ -54,6 +54,7 @@ def main():
     # Step 6: Save results to Excel
     output_excel_file = os.path.join(folder_path, "processed_output.xlsx")
     generate_excel_sheets(combined_data, filtered_data, summary, output_excel_file)
+    logging.info(f"Data successfully saved to Excel: {output_excel_file}")
 
 
 if __name__ == "__main__":

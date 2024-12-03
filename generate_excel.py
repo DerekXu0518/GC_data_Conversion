@@ -19,7 +19,6 @@ def generate_excel_sheets(combined_data, filtered_data, summary, output_file):
             filtered_data.to_excel(writer, sheet_name='Filtered Data', index=False)
             summary.to_excel(writer, sheet_name='Summary', index=False)
 
-        logging.info(f"Data successfully saved to Excel: {output_file}")
     except Exception as e:
         logging.error(f"Error saving data to Excel: {e}")
         raise
