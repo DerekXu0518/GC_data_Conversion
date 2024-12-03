@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+from tkinter import Tk
+from tkinter.filedialog import askdirectory
 
 
 def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
@@ -25,9 +27,6 @@ def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
     data_lines = lines[start_index + 3:]
     relevant_columns = ['R.Time', 'Area', 'Height']
     column_indices = {col: header_line.index(col) for col in relevant_columns if col in header_line}
-
-    # Verify column mappings
-    print(f"Column Indices: {column_indices}")
 
     # Extract the rows with relevant columns
     extracted_data = []
@@ -63,8 +62,14 @@ def process_and_separate_files(folder_path, output_csv, peak_table='Ch1'):
 
 
 if __name__ == "__main__":
-    folder_path = input("Enter the folder path containing the files: ").strip()
-    output_csv = os.path.join(folder_path, "combined_output_with_separators.csv")  # Output CSV
-    peak_table = input("Enter the peak table identifier (default 'Ch1'): ").strip() or 'Ch1'
+    # Use a GUI dialog to select the folder
+    print("Select the folder containing the files.")
+    Tk().withdraw()  # Hide the root window
+    folder_path = askdirectory(title="Select Folder")
 
-    process_and_separate_files(folder_path, output_csv, peak_table)
+    if not folder_path:
+        print("No folder selected. Exiting.")
+    else:
+        output_csv = os.path.join(folder_path, "combined_output_with_separators.csv")  # Output CSV
+        peak_table = input("Enter the peak table identifier (default 'Ch1'): ").strip() or 'Ch1'
+        process_and_separate_files(folder_path, output_csv, peak_table)
