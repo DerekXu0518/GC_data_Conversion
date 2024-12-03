@@ -35,12 +35,13 @@ A Python-based tool for processing, filtering, and analyzing GC (Gas Chromatogra
   - `xlsxwriter`
   - `tkinter` (built-in with Python)
 
-To install missing packages, run:
-```bash
-pip install pandas openpyxl xlsxwriter
+   To install missing packages, run:
+   ```bash
+   pip install pandas openpyxl xlsxwriter
+
+---
 
 ## **Usage**
-
 ### **Step 1: Prepare Your Files**
 - Ensure your GC data files are in `.TXT` format and stored in a folder.
 - The filenames must include collection time information in the format `*-X.Xct-*` (e.g., `20241202-0.1PO-1NH3-0.2ct-20.0min.TXT`).
