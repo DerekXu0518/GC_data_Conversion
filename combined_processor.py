@@ -74,7 +74,7 @@ def process_and_separate_files_naturally_sorted(folder_path, output_csv, peak_ta
 def process_and_filter_file(input_file, target_r_times, tolerance, output_file):
     """
     Filters rows from a combined CSV file based on R.Time values,
-    ensuring the source file name is written only once for each set of data.
+    ensuring the 'Source File' header is shown only once for each set of data.
 
     :param input_file: Path to the input CSV file with source file separators.
     :param target_r_times: List of target R.Time values to filter around.
@@ -92,18 +92,20 @@ def process_and_filter_file(input_file, target_r_times, tolerance, output_file):
             stripped_line = line.strip()
 
             if stripped_line.startswith("Source File:"):
+                # Update the current source file
                 current_source_file = stripped_line.split(": ", 1)[1]
             elif stripped_line and current_source_file:
+                # Parse data rows
                 columns = stripped_line.split(",")
                 if len(columns) >= 3:
                     try:
-                        r_time = float(columns[0])  # R.Time should be the first column
-                        area = columns[1]          # Area (2nd column)
-                        height = columns[2]        # Height (3rd column)
+                        r_time = float(columns[0])  # R.Time
+                        area = columns[1]          # Area
+                        height = float(columns[2]) # Height
 
-                        if any(target - tolerance <= r_time <= target + tolerance for target in target_r_times):
-                            filtered_data.append((current_source_file, [r_time, area, height]))
-
+                        for target in target_r_times:
+                            if target - tolerance <= r_time <= target + tolerance:
+                                filtered_data.append((current_source_file, target, r_time, area, height))
                     except ValueError:
                         continue
 
@@ -111,18 +113,22 @@ def process_and_filter_file(input_file, target_r_times, tolerance, output_file):
             print("No data matched the filtering criteria.")
             return
 
+        # Select the largest peak for each target range and source file
+        from collections import defaultdict
+
+        grouped_data = defaultdict(list)
+        for source_file, target, r_time, area, height in filtered_data:
+            grouped_data[source_file].append((target, r_time, area, height))
+
         # Save filtered data to the output file
         with open(output_file, 'w') as output_file:
-            output_file.write("Source File,R.Time,Area,Height\n")  # Add header
-            previous_source_file = None
-            for source_file, data_row in filtered_data:
-                # Write the source file name only if it changes
-                if source_file != previous_source_file:
-                    output_file.write(f"{source_file},,,\n")
-                    previous_source_file = source_file
-
-                # Write the data row
-                output_file.write(f",{','.join(map(str, data_row))}\n")
+            for source_file, rows in grouped_data.items():
+                # Write the source file header
+                output_file.write(f"Source File: {source_file}\n")
+                output_file.write("Target R.Time,R.Time,Area,Height\n")
+                for target, r_time, area, height in rows:
+                    output_file.write(f"{target},{r_time},{area},{height}\n")
+                output_file.write("\n")  # Add a blank line between datasets
 
         print(f"Filtered data saved to: {output_file.name}")
 
