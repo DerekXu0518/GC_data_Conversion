@@ -1,12 +1,18 @@
 import os
 import pandas as pd
-from natsort import natsorted
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
+    """
+    Extracts and validates peak table data from a file.
+
+    :param file_path: Path to the file.
+    :param peak_table: Peak table identifier.
+    :return: DataFrame with 'R.Time', 'Area', 'Height' columns.
+    """
     try:
         with open(file_path, 'r', encoding='ISO-8859-1') as file:
             lines = file.readlines()
@@ -40,91 +46,85 @@ def extract_and_validate_peak_table(file_path, peak_table='Ch1'):
     return pd.DataFrame(extracted_data)
 
 
-def process_and_separate_files_naturally_sorted(folder_path, output_csv, peak_table='Ch1'):
+def process_and_separate_files_naturally_sorted(folder_path, peak_table):
+    """
+    Processes files with natural sorting and returns a combined DataFrame.
+
+    :param folder_path: Path to the folder containing the files.
+    :param peak_table: Peak table identifier.
+    :return: Combined DataFrame.
+    """
     try:
-        sorted_files = natsorted(
-            [f for f in os.listdir(folder_path) if f.lower().endswith('.txt') and os.path.isfile(os.path.join(folder_path, f))]
-        )
-        if not sorted_files:
-            logging.warning(f"No .txt files found in folder {folder_path}.")
-            return
+        combined_data = pd.DataFrame()
+        file_list = sorted([f for f in os.listdir(folder_path) if f.endswith(".TXT")])
+        logging.info(f"Found {len(file_list)} files to process.")
 
-        with open(output_csv, 'w') as output_file:
-            header_written = False
-            for filename in sorted_files:
-                file_path = os.path.join(folder_path, filename)
-                logging.info(f"Processing {filename}...")
+        for file_name in file_list:
+            file_path = os.path.join(folder_path, file_name)
+            logging.info(f"Processing file: {file_name}")
+            try:
+                data = extract_and_validate_peak_table(file_path, peak_table)
+                if data.empty:
+                    logging.warning(f"No valid data extracted from {file_name}.")
+                    continue
 
-                df = extract_and_validate_peak_table(file_path, peak_table)
-                if not df.empty:
-                    output_file.write(f"Source File: {filename}\n")
-                    if not header_written:
-                        df.to_csv(output_file, index=False)
-                        header_written = True
-                    else:
-                        df.to_csv(output_file, index=False, header=False)
-                    output_file.write("\n")
+                # Add a 'Source File' column
+                data["Source File"] = file_name
 
-        logging.info(f"Combined data with file separators saved to {output_csv}")
+                # Combine the data
+                combined_data = pd.concat([combined_data, data], ignore_index=True)
+            except Exception as e:
+                logging.error(f"Error processing file {file_name}: {e}")
+
+        if combined_data.empty:
+            logging.warning("No data found after processing files.")
+            return None
+
+        logging.info("Combined data created successfully.")
+        return combined_data
 
     except Exception as e:
-        logging.error(f"Error processing files: {e}")
+        logging.error(f"Error during file processing: {e}")
+        return None
 
 
-def process_and_filter_file(input_file, target_r_times, tolerance, output_file):
+def process_and_filter_file(input_data, target_r_times, tolerance):
     """
-    Filters rows from a combined CSV file based on R.Time values,
-    ensuring the source file name is written only once for each set of data.
+    Filters rows from the combined data based on R.Time values and selects the largest peak.
 
-    :param input_file: Path to the input CSV file with source file separators.
+    :param input_data: DataFrame containing the combined data.
     :param target_r_times: List of target R.Time values to filter around.
     :param tolerance: Tolerance range for filtering.
-    :param output_file: Path to save the filtered CSV.
+    :return: Filtered DataFrame.
     """
     try:
-        with open(input_file, 'r') as file:
-            lines = file.readlines()
+        if 'R.Time' not in input_data.columns:
+            raise ValueError("Missing 'R.Time' column in the input data.")
 
-        current_source_file = None
-        filtered_data = []
+        # Ensure R.Time and Area are numeric
+        input_data['R.Time'] = pd.to_numeric(input_data['R.Time'], errors='coerce')
+        input_data['Area'] = pd.to_numeric(input_data['Area'], errors='coerce')
 
-        for line in lines:
-            stripped_line = line.strip()
+        # Add a 'Target R.Time' column to identify matched rows
+        def match_r_time(row):
+            for target in target_r_times:
+                if abs(row['R.Time'] - target) <= tolerance:
+                    return target
+            return None
 
-            if stripped_line.startswith("Source File:"):
-                current_source_file = stripped_line.split(": ", 1)[1]
-            elif stripped_line and current_source_file:
-                columns = stripped_line.split(",")
-                if len(columns) >= 3:
-                    try:
-                        r_time = float(columns[0])  # R.Time should be the first column
-                        area = columns[1]          # Area (2nd column)
-                        height = columns[2]        # Height (3rd column)
+        input_data['Target R.Time'] = input_data.apply(match_r_time, axis=1)
 
-                        if any(target - tolerance <= r_time <= target + tolerance for target in target_r_times):
-                            filtered_data.append((current_source_file, [r_time, area, height]))
+        # Filter rows that matched any target R.Time
+        filtered_data = input_data[input_data['Target R.Time'].notnull()]
 
-                    except ValueError:
-                        continue
+        # Select the largest peak area for each Source File and Target R.Time
+        filtered_data = (
+            filtered_data.loc[filtered_data.groupby(['Source File', 'Target R.Time'])['Area'].idxmax()]
+            .reset_index(drop=True)
+        )
 
-        if not filtered_data:
-            print("No data matched the filtering criteria.")
-            return
-
-        # Save filtered data to the output file
-        with open(output_file, 'w') as output_file:
-            output_file.write("Source File,R.Time,Area,Height\n")  # Add header
-            previous_source_file = None
-            for source_file, data_row in filtered_data:
-                # Write the source file name only if it changes
-                if source_file != previous_source_file:
-                    output_file.write(f"{source_file},,,\n")
-                    previous_source_file = source_file
-
-                # Write the data row
-                output_file.write(f",{','.join(map(str, data_row))}\n")
-
-        print(f"Filtered data saved to: {output_file.name}")
+        return filtered_data
 
     except Exception as e:
-        logging.error(f"Error processing and filtering files: {e}")
+        logging.error(f"Error filtering data: {e}")
+        raise
