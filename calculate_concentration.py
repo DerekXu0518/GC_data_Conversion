@@ -22,7 +22,13 @@ def calculate_concentration(filtered_data, compound_mapping, diglyme_amount=0.00
 
         # Extract collection time from Source File
         def extract_collection_time(filename):
-            match = re.search(r'-(\\d+\\.\\d+)ct-', filename)
+            """
+            Extracts collection time from the filename, recognizing both 'ct' and 'CT'.
+
+            :param filename: The name of the file.
+            :return: Extracted collection time as a float, or None if not found.
+            """
+            match = re.search(r'-(\d+\.\d+)(ct|CT)-', filename, re.IGNORECASE)
             return float(match.group(1)) if match else None
 
         filtered_data['Collection Time'] = filtered_data['Source File'].apply(extract_collection_time)
