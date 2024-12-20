@@ -3,9 +3,9 @@ from tkinter import Tk
 from tkinter.filedialog import askdirectory
 import logging
 from data_processor import process_and_separate_files_naturally_sorted, process_and_filter_file
-from calculate_concentration import calculate_concentration
 from generate_excel import generate_excel_sheets
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def select_folder():
@@ -31,29 +31,32 @@ def main():
     # Step 3: Process files with natural sorting
     logging.info("Processing files with natural sorting...")
     combined_data = process_and_separate_files_naturally_sorted(folder_path, peak_table)
+    logging.debug(f"Combined data columns: {combined_data.columns}")
+    logging.debug(f"Combined data sample:\n{combined_data.head()}")
 
     if combined_data.empty:
-        raise ValueError("No valid data found in the selected files. Ensure the input files are correctly formatted.")
+        logging.error("No valid data found in the selected files. Ensure the input files are correctly formatted.")
+        return
 
     # Step 4: Filter combined data
     logging.info("Filtering data based on R.Time values 1.6, 2.3, and 3.6...")
     target_r_times = [1.6, 2.3, 3.6]
     tolerance = 0.1
     filtered_data = process_and_filter_file(combined_data, target_r_times, tolerance)
+    logging.debug(f"Filtered data sample:\n{filtered_data.head()}")
 
     if filtered_data.empty:
-        raise ValueError("No matching R.Time data found after filtering. Check the target R.Time values or input data.")
+        logging.error("No matching R.Time data found after filtering. Check the target R.Time values or input data.")
+        return
 
     logging.info("Data filtered successfully.")
 
-    # Step 5: Calculate concentrations
-    logging.info("Calculating concentrations and updating filtered data...")
-    compound_mapping = {1.6: "PO", 2.3: "MIPA", 3.6: "Diglyme"}
-    filtered_data, summary = calculate_concentration(filtered_data, compound_mapping)
+    # Step 5: Skip concentration calculation
+    logging.info("Skipping concentration calculation. Output will only include combined and filtered data.")
 
     # Step 6: Save results to Excel
     output_excel_file = os.path.join(folder_path, "processed_output.xlsx")
-    generate_excel_sheets(combined_data, filtered_data, summary, output_excel_file)
+    generate_excel_sheets(combined_data, filtered_data, output_file=output_excel_file)
     logging.info(f"Data successfully saved to Excel: {output_excel_file}")
 
 

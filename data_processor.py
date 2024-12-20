@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 from file_extractor import extract_and_validate_peak_table
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def process_and_separate_files_naturally_sorted(folder_path, peak_table):
     try:
@@ -28,30 +28,49 @@ def process_and_separate_files_naturally_sorted(folder_path, peak_table):
 
 def process_and_filter_file(input_data, target_r_times, tolerance):
     """
-    Filters rows based on R.Time values and selects the largest peak.
+    Filters rows from the input DataFrame based on R.Time values, selects the largest Area,
+    and restructures the output to display Area data for each compound in separate columns.
 
-    :param input_data: Combined DataFrame.
-    :param target_r_times: List of target R.Time values.
+    :param input_data: DataFrame containing combined data.
+    :param target_r_times: List of target R.Time values to filter.
     :param tolerance: Tolerance range for filtering.
-    :return: Filtered DataFrame.
+    :return: Filtered DataFrame with Area data for each compound in separate columns.
     """
     try:
+        if 'R.Time' not in input_data.columns:
+            raise ValueError("Missing 'R.Time' column in the input data.")
+
+        # Ensure numeric conversion
+        input_data = input_data.copy()
         input_data['R.Time'] = pd.to_numeric(input_data['R.Time'], errors='coerce')
         input_data['Area'] = pd.to_numeric(input_data['Area'], errors='coerce')
 
-        # Add Target R.Time column
+        # Assign Target R.Time
         input_data['Target R.Time'] = input_data['R.Time'].apply(
             lambda x: next((target for target in target_r_times if abs(x - target) <= tolerance), None)
         )
-        filtered_data = input_data[input_data['Target R.Time'].notnull()]
+        input_data = input_data.dropna(subset=['Target R.Time'])
 
-        # Select largest peak
-        filtered_data = (
-            filtered_data.loc[filtered_data.groupby(['Source File', 'Target R.Time'])['Area'].idxmax()]
-            .reset_index(drop=True)
-        )
-        return filtered_data
+        # Group and select the largest Area
+        grouped = input_data.groupby(['Source File', 'Target R.Time'])
+        largest_area_idx = grouped['Area'].idxmax()
+        filtered_data = input_data.loc[largest_area_idx]
+
+        # Pivot to restructure output
+        compound_mapping = {1.6: 'PO', 2.3: 'Amino Alcohol', 3.6: 'Diglyme'}
+        filtered_data['Compound'] = filtered_data['Target R.Time'].map(compound_mapping)
+        pivoted_data = filtered_data.pivot(index='Source File', columns='Compound', values='Area').reset_index()
+
+        # Rename columns for clarity
+        pivoted_data.columns.name = None
+        pivoted_data = pivoted_data.rename(columns={
+            'PO': 'PO Area',
+            'Amino Alcohol': 'Amino Alcohol Area',
+            'Diglyme': 'Diglyme Area'
+        })
+
+        return pivoted_data
 
     except Exception as e:
-        logging.error(f"Error filtering data: {e}")
-        raise
+        logging.error(f"Error filtering and restructuring data: {e}")
+        return pd.DataFrame()
