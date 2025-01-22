@@ -1,22 +1,26 @@
 import pandas as pd
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 def generate_excel_sheets(combined_data, filtered_data, output_file):
     """
-    Generate an Excel file with the provided data and save it to the specified output file.
-    Ensures the sheet order: PO, Amino Alcohol, Diglyme.
+    Save combined and filtered data to an Excel file, using the Hierarchy column for sorting.
 
-    :param combined_data: DataFrame for the combined output.
-    :param filtered_data: DataFrame for the filtered data.
-    :param output_file: Path to save the Excel file.
+    :param combined_data: DataFrame containing combined data.
+    :param filtered_data: DataFrame containing filtered data.
+    :param output_file: Path to the output Excel file.
     """
-    with pd.ExcelWriter(output_file, engine="xlsxwriter") as writer:
-        # Sort the filtered_data columns to ensure the correct order of compounds
-        filtered_data = filtered_data[['Source File', 'PO Area', 'Amino Alcohol Area', 'Diglyme Area']]
+    try:
+        # Ensure 'Hierarchy' and 'R.Time' sorting
+        combined_data = combined_data.sort_values(by=['Hierarchy', 'R.Time'], ascending=[True, True])
+        filtered_data = filtered_data.sort_values(by=['Hierarchy', 'R.Time'], ascending=[True, True])
+
+        # Drop the Hierarchy column before exporting
+        combined_data = combined_data.drop(columns=['Hierarchy'])
+        filtered_data = filtered_data.drop(columns=['Hierarchy'])
 
         # Write data to Excel
-        combined_data.to_excel(writer, sheet_name="Combined Output", index=False)
-        filtered_data.to_excel(writer, sheet_name="Filtered Data", index=False)
+        with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+            combined_data.to_excel(writer, sheet_name="Combined Data", index=False)
+            filtered_data.to_excel(writer, sheet_name="Filtered Data", index=False)
+
+    except Exception as e:
+        raise RuntimeError(f"Error saving data to Excel: {e}")

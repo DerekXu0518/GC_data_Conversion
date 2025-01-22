@@ -31,8 +31,6 @@ def main():
     # Step 3: Process files with natural sorting
     logging.info("Processing files with natural sorting...")
     combined_data = process_and_separate_files_naturally_sorted(folder_path, peak_table)
-    logging.debug(f"Combined data columns: {combined_data.columns}")
-    logging.debug(f"Combined data sample:\n{combined_data.head()}")
 
     if combined_data.empty:
         logging.error("No valid data found in the selected files. Ensure the input files are correctly formatted.")
@@ -41,9 +39,9 @@ def main():
     # Step 4: Filter combined data
     logging.info("Filtering data based on R.Time values 1.6, 2.3, and 3.6...")
     target_r_times = [1.6, 2.3, 3.6]
+    compound_mapping = {1.6: "PO", 2.3: "MIPA", 3.6: "Diglyme"}
     tolerance = 0.1
-    filtered_data = process_and_filter_file(combined_data, target_r_times, tolerance)
-    logging.debug(f"Filtered data sample:\n{filtered_data.head()}")
+    filtered_data = process_and_filter_file(combined_data, target_r_times, tolerance, compound_mapping)
 
     if filtered_data.empty:
         logging.error("No matching R.Time data found after filtering. Check the target R.Time values or input data.")
