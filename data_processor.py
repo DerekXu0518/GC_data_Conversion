@@ -2,34 +2,38 @@ import os
 import pandas as pd
 import re
 from file_extractor import extract_and_validate_peak_table
+import logging
 
 
 def generate_hierarchy_column(data):
     """
-    Generate a hierarchy column for sorting based on Source File and R.Time.
-
-    :param data: DataFrame containing 'Source File' and 'R.Time'.
-    :return: Modified DataFrame with a hierarchy column added.
+    Generates a hierarchy column for sorting based on Source File and R.Time.
+    Ensures numeric values are properly sorted within hierarchical structure.
     """
+
     def extract_sort_key(string):
         """
-        Generate a hierarchical sort key from the source file name.
-        Splits by '-' and sorts numerically wherever possible.
+        Extracts a hierarchical sort key from the source file name.
+        - Splits by dashes ("-") and sorts numbers numerically while keeping text-based identifiers.
         """
         parts = string.split('-')
         sort_key = []
+
         for part in parts:
-            match = re.match(r'(\d+)', part)
-            if match:
-                sort_key.append(int(match.group(1)))  # Convert numbers to integers
-            else:
-                sort_key.append(part.lower())  # Keep text parts as lowercase
+            num_matches = re.findall(r'\d+', part)  # Extract all numeric values
+            non_num_part = re.sub(r'\d+', '', part).lower()  # Extract non-numeric text
+
+            if num_matches:
+                sort_key.extend([int(num) for num in num_matches])  # Convert numbers to integers for sorting
+            if non_num_part:
+                sort_key.append(non_num_part)  # Keep text parts in order
+
         return tuple(sort_key)
 
-    # Generate hierarchy based on Source File first
+    # Generate hierarchy based on the Source File first
     data['Hierarchy'] = data['Source File'].map(extract_sort_key)
 
-    # Append R.Time as the final level of hierarchy
+    # Append R.Time to the hierarchy for final sorting
     data['Hierarchy'] = data.apply(lambda row: row['Hierarchy'] + (row['R.Time'],), axis=1)
 
     return data
@@ -82,57 +86,67 @@ def process_and_separate_files_naturally_sorted(folder_path, peak_table):
 
 def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapping):
     """
-    Filters and restructures data based on the largest peak area within specified R.Time values.
+    Filters and processes GC data to retain only the highest peak for each compound in each dataset.
 
-    :param input_data: DataFrame containing combined data.
-    :param target_r_times: List of target R.Time values to filter around.
+    :param input_data: DataFrame containing the combined data.
+    :param target_r_times: List of target R.Time values.
     :param tolerance: Tolerance range for filtering.
-    :param compound_mapping: Dictionary mapping target R.Time values to compound names.
-    :return: Filtered and restructured DataFrame.
+    :param compound_mapping: Dictionary mapping R.Time to compound names.
+    :return: Filtered DataFrame with one row per dataset.
     """
     try:
-        # Ensure numeric conversion
-        input_data['R.Time'] = pd.to_numeric(input_data['R.Time'], errors='coerce')
-        input_data['Area'] = pd.to_numeric(input_data['Area'], errors='coerce')
+        if "R.Time" not in input_data.columns or "Area" not in input_data.columns:
+            raise ValueError("Missing required columns: 'R.Time' or 'Area'")
 
-        # Ensure deep copy to avoid SettingWithCopyWarning
-        input_data = input_data.copy()
+        # Convert Area to numeric to prevent string comparison issues
+        input_data["Area"] = pd.to_numeric(input_data["Area"], errors="coerce")
 
-        # Assign Target R.Time for filtering
-        input_data['Target R.Time'] = input_data['R.Time'].apply(
-            lambda x: next((target for target in target_r_times if abs(x - target) <= tolerance), None)
-        )
-        input_data = input_data.dropna(subset=['Target R.Time'])
+        # Step 1: Apply tolerance filtering to find relevant R.Time values
+        filtered = input_data[
+            input_data["R.Time"].apply(lambda x: any(abs(x - target) <= tolerance for target in target_r_times))
+        ].copy()
 
-        # Ensure Compound column is created before filtering
-        input_data.loc[:, "Compound"] = input_data["Target R.Time"].map(compound_mapping)
+        if filtered.empty:
+            logging.warning("No matching R.Time data found after filtering.")
+            return pd.DataFrame()
 
-        # Ensure Hierarchy column exists before pivoting
-        if 'Hierarchy' not in input_data.columns:
-            raise ValueError("Hierarchy column missing before filtering")
-
-        # Group and select largest Area
-        grouped = input_data.groupby(['Source File', 'Target R.Time'])
-        largest_area_idx = grouped['Area'].idxmax()
-        filtered_data = input_data.loc[largest_area_idx]
-
-        # Keep necessary columns, including Hierarchy
-        filtered_data = filtered_data[['Source File', 'R.Time', 'Compound', 'Area', 'Hierarchy']]
-
-        # Pivot Data while retaining Hierarchy
-        pivoted_data = filtered_data.pivot(index=['Source File', 'Hierarchy'], columns='Compound', values='Area').reset_index()
-        pivoted_data.columns.name = None
-        pivoted_data = pivoted_data.rename(columns={f"{compound}": f"{compound} Area" for compound in compound_mapping.values()})
-
-        # Merge R.Time and Hierarchy for reference
-        pivoted_data = pd.merge(
-            pivoted_data,
-            filtered_data[['Source File', 'R.Time', 'Hierarchy']].drop_duplicates(),
-            on=['Source File', 'Hierarchy'],
-            how='left'
+        # Step 2: Assign nearest target R.Time for each filtered entry
+        filtered["Target R.Time"] = filtered["R.Time"].apply(
+            lambda x: min(target_r_times, key=lambda target: abs(x - target))
         )
 
-        return pivoted_data
+        # Step 3: Map R.Time values to compound names
+        filtered["Compound"] = filtered["Target R.Time"].map(compound_mapping)
+
+        # Ensure compounds are in the correct order (PO, MIPA, Diglyme)
+        compound_order = ["PO", "MIPA", "Diglyme"]
+        filtered["Compound"] = pd.Categorical(filtered["Compound"], categories=compound_order, ordered=True)
+
+        # Step 4: Select the highest area peak for each compound per dataset
+        filtered = filtered.sort_values(by=["Source File", "Compound", "Area"], ascending=[True, True, False])
+
+        # **Fixing the duplicate issue**: Group by "Source File" and "Compound" to ensure unique entries
+        filtered = filtered.groupby(["Source File", "Compound"], as_index=False).first()
+
+        # Step 5: Pivot table to ensure one row per dataset
+        pivoted_data = filtered.pivot(index="Source File", columns="Compound", values="Area").reset_index()
+
+        # Rename columns for clarity
+        pivoted_data.rename(columns={"PO": "PO Area", "MIPA": "MIPA Area", "Diglyme": "Diglyme Area"}, inplace=True)
+
+        # Step 6: Merge with hierarchy for final sorting
+        hierarchy_data = input_data[['Source File', 'Hierarchy']].drop_duplicates()
+        pivoted_data = pivoted_data.merge(hierarchy_data, on="Source File", how="left")
+
+        # Sort based on hierarchy
+        pivoted_data = pivoted_data.sort_values(by=["Hierarchy"], ascending=True)
+
+        # **Final Fix:** Remove duplicates again just in case
+        pivoted_data = pivoted_data.drop_duplicates(subset=["Source File"])
+
+        # Remove the hierarchy column before exporting
+        return pivoted_data.drop(columns=["Hierarchy"], errors="ignore")
 
     except Exception as e:
-        raise RuntimeError(f"Error filtering and restructuring data: {e}")
+        logging.error(f"Error filtering and restructuring data: {e}")
+        return pd.DataFrame()

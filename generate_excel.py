@@ -9,13 +9,19 @@ def generate_excel_sheets(combined_data, filtered_data, output_file):
     :param output_file: Path to the output Excel file.
     """
     try:
-        # Ensure 'Hierarchy' and 'R.Time' sorting
-        combined_data = combined_data.sort_values(by=['Hierarchy', 'R.Time'], ascending=[True, True])
-        filtered_data = filtered_data.sort_values(by=['Hierarchy', 'R.Time'], ascending=[True, True])
+        # Ensure sorting for Combined Data (Hierarchy + R.Time)
+        if 'Hierarchy' in combined_data.columns and 'R.Time' in combined_data.columns:
+            combined_data = combined_data.sort_values(by=['Hierarchy', 'R.Time'], ascending=[True, True])
+        elif 'Hierarchy' in combined_data.columns:
+            combined_data = combined_data.sort_values(by=['Hierarchy'], ascending=[True])
 
-        # Drop the Hierarchy column before exporting
-        combined_data = combined_data.drop(columns=['Hierarchy'])
-        filtered_data = filtered_data.drop(columns=['Hierarchy'])
+        # Ensure sorting for Filtered Data (Hierarchy only, since R.Time was dropped)
+        if 'Hierarchy' in filtered_data.columns:
+            filtered_data = filtered_data.sort_values(by=['Hierarchy'], ascending=[True])
+
+        # Drop unnecessary columns before exporting
+        combined_data = combined_data.drop(columns=['Hierarchy'], errors='ignore')
+        filtered_data = filtered_data.drop(columns=['Hierarchy'], errors='ignore')
 
         # Write data to Excel
         with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
