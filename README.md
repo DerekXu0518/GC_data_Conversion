@@ -14,11 +14,7 @@ A Python-based tool for processing, filtering, and analyzing GC (Gas Chromatogra
    - Filters data based on target retention times (`R.Time`) with a configurable tolerance.
    - Automatically selects the largest peak for each retention time in each file.
 
-3. **Concentration Calculation**:
-   - Calculates concentrations for compounds using Diglyme as the internal standard.
-   - Supports customizable relative response factors (RRFs) and Diglyme amounts.
-
-4. **Excel Export**:
+3. **Excel Export**:
    - Exports processed data into a single Excel file with three sheets:
      - **Combined Output**: All processed data.
      - **Filtered Data**: Filtered rows based on retention times.
