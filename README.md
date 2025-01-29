@@ -65,16 +65,38 @@ A Python-based tool for processing, filtering, and analyzing GC (Gas Chromatogra
 
 ## **Output**
 
-The tool saves the results as an Excel file in the same folder as the input data. The output file is named `processed_output.xlsx` and includes the following sheets:
+The tool saves the processed results as an Excel file named `processed_output.xlsx` in the same folder as the input data. The output file consists of the following sheets:
 
-1. **Combined Output**:
-   - Contains all extracted and processed data, including columns like `R.Time`, `Area`, `Height`, and `Source File`.
+### **1. Combined Output**
+   - Contains all extracted and processed data.
+   - Includes key columns such as:
+     - `R.Time` (Retention Time)
+     - `Area`
+     - `Height`
+     - `Source File`
+   - Data is sorted hierarchically based on the identifiers in the source filenames.
 
-2. **Filtered Data**:
-   - Displays rows filtered by retention times (`1.6`, `2.3`, `3.6`), with the largest peak for each retention time in each dataset.
+### **2. Filtered Data**
+   - Displays rows filtered based on the specified retention times (`1.6`, `2.3`, `3.6`).
+   - Retains only the largest peak for each retention time per dataset.
+   - Data is structured with columns:
+     - `Source File`
+     - `PO Area`
+     - `MIPA Area`
+     - `Diglyme Area`
+   - Sorted by hierarchy and retention time.
 
-3. **Summary**:
-   - Shows calculated concentrations for compounds (`PO`, `MIPA`, and `Diglyme`) based on the filtered data, using Diglyme as the internal standard.
+### **3. Summary (Optional)**
+   - This sheet is included only when concentration calculation is enabled.
+   - Shows calculated concentrations for `PO`, `MIPA`, and `Diglyme`.
+   - Uses `Diglyme` as the internal standard for calculations.
+   - Data is structured with:
+     - `Source File`
+     - `PO Concentration`
+     - `MIPA Concentration`
+     - `Diglyme Concentration`
+   - If concentration calculation is disabled, only the **Combined Output** and **Filtered Data** sheets will be generated.
+
 
 ## **Configuration**
 
@@ -90,11 +112,6 @@ The tool saves the results as an Excel file in the same folder as the input data
 
 - These values can be changed in the `Launcher.py` file.
 
-### **Relative Response Factors (RRFs)**
-- The default relative response factors and Diglyme amount are set in the `calculate_concentration.py` file:
-  ```python
-  relative_response_factors = {'PO': 0.42, 'MIPA': 0.5}
-  diglyme_amount = 0.00014
 
 ## **Troubleshooting**
 
