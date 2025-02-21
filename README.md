@@ -35,6 +35,7 @@ A Python-based tool for processing, filtering, and analyzing GC (Gas Chromatogra
   - `xlsxwriter`
   - `tkinter` (built-in with Python)
 
+
    To install missing packages, run:
    ```bash
    pip install pandas openpyxl xlsxwriter
@@ -131,3 +132,8 @@ The tool saves the processed results as an Excel file named `processed_output.xl
 ## **Acknowledgments**
 
 This tool was developed to streamline the processing and analysis of GC data files, providing an efficient and user-friendly solution for handling and analyzing chromatographic data.
+=======
+To install missing packages, run:
+```bash
+pip install pandas openpyxl xlsxwriter
+
