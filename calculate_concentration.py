@@ -41,7 +41,7 @@ def calculate_concentration(filtered_data, compound_mapping, diglyme_amount=0.00
         diglyme_areas = filtered_data[filtered_data['Compound'] == 'Diglyme'].set_index('Source File')['Area']
 
         # Relative response factors
-        relative_response_factors = {'PO': 0.42, 'MIPA': 0.5}
+        relative_response_factors = {'PO': 0.42, '2-MIPA': 0.5, '1-MIPA': 0.5}
 
         # Calculate concentrations
         def calculate(row):

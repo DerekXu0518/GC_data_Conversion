@@ -8,6 +8,7 @@ from generate_excel import generate_excel_sheets
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+
 def select_folder():
     """
     Opens a dialog for the user to select a folder containing files to process.
@@ -16,6 +17,7 @@ def select_folder():
     """
     Tk().withdraw()  # Hide the root tkinter window
     return askdirectory(title="Select the folder containing the files")
+
 
 def main():
     # Step 1: Select folder
@@ -36,11 +38,19 @@ def main():
         logging.error("No valid data found in the selected files. Ensure the input files are correctly formatted.")
         return
 
-    # Step 4: Filter combined data
-    logging.info("Filtering data based on R.Time values 1.6, 2.3, and 3.6...")
-    target_r_times = [1.6, 2.3, 3.6]
-    compound_mapping = {1.6: "PO", 2.3: "MIPA", 3.6: "Diglyme"}
+    # Step 4: Define filtering parameters (Dynamic target R.Time & compound mapping)
+    logging.info("Filtering data based on target R.Time values...")
+
+    target_r_times = [2.0, 4.2, 4.4, 7.7]  # Modify this list to include more compounds
+    compound_mapping = {  # This dictionary dynamically maps R.Time to compound names
+        2.0: "PO",
+        4.2: "2-MIPA",
+        4.4: "1-MIPA",
+        7.7: "Diglyme"
+    }
     tolerance = 0.1
+
+    # Process and filter data
     filtered_data = process_and_filter_file(combined_data, target_r_times, tolerance, compound_mapping)
 
     if filtered_data.empty:

@@ -4,6 +4,9 @@ import re
 from file_extractor import extract_and_validate_peak_table
 import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 def generate_hierarchy_column(data):
     """
@@ -32,9 +35,6 @@ def generate_hierarchy_column(data):
 
     # Generate hierarchy based on the Source File first
     data['Hierarchy'] = data['Source File'].map(extract_sort_key)
-
-    # Append R.Time to the hierarchy for final sorting
-    data['Hierarchy'] = data.apply(lambda row: row['Hierarchy'] + (row['R.Time'],), axis=1)
 
     return data
 
@@ -72,11 +72,11 @@ def process_and_separate_files_naturally_sorted(folder_path, peak_table):
         if combined_data.empty:
             raise ValueError("No valid data found in the selected files.")
 
-        # Generate new hierarchy with R.Time embedded
+        # Generate new hierarchy for sorting
         combined_data = generate_hierarchy_column(combined_data)
 
-        # Sort using the new hierarchy, which includes R.Time
-        combined_data = combined_data.sort_values(by=["Hierarchy"], ascending=True)
+        # Sort using the new hierarchy
+        combined_data = combined_data.sort_values(by=["Hierarchy", "R.Time"], ascending=True)
 
         return combined_data
 
@@ -118,8 +118,8 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
         # Step 3: Map R.Time values to compound names
         filtered["Compound"] = filtered["Target R.Time"].map(compound_mapping)
 
-        # Ensure compounds are in the correct order (PO, MIPA, Diglyme)
-        compound_order = ["PO", "MIPA", "Diglyme"]
+        # Ensure compound order is consistent and sorted
+        compound_order = sorted(filtered["Compound"].unique(), key=lambda x: (x is None, x))
         filtered["Compound"] = pd.Categorical(filtered["Compound"], categories=compound_order, ordered=True)
 
         # Step 4: Select the highest area peak for each compound per dataset
@@ -128,11 +128,8 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
         # **Fixing the duplicate issue**: Group by "Source File" and "Compound" to ensure unique entries
         filtered = filtered.groupby(["Source File", "Compound"], as_index=False).first()
 
-        # Step 5: Pivot table to ensure one row per dataset
+        # Step 5: Pivot table dynamically (handles any new compound names)
         pivoted_data = filtered.pivot(index="Source File", columns="Compound", values="Area").reset_index()
-
-        # Rename columns for clarity
-        pivoted_data.rename(columns={"PO": "PO Area", "MIPA": "MIPA Area", "Diglyme": "Diglyme Area"}, inplace=True)
 
         # Step 6: Merge with hierarchy for final sorting
         hierarchy_data = input_data[['Source File', 'Hierarchy']].drop_duplicates()
