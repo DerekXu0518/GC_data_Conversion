@@ -17,19 +17,33 @@ def generate_hierarchy_column(data):
     def extract_sort_key(string):
         """
         Extracts a hierarchical sort key from the source file name.
-        - Splits by dashes ("-") and sorts numbers numerically while keeping text-based identifiers.
+        Splits on dashes and creates a uniform tuple of (type_flag, value) pairs:
+          - type_flag = 0 for numbers, 1 for text.
+          - value = int(number) or lowercase string.
         """
+        import re
+
         parts = string.split('-')
         sort_key = []
 
         for part in parts:
-            num_matches = re.findall(r'\d+', part)  # Extract all numeric values
-            non_num_part = re.sub(r'\d+', '', part).lower()  # Extract non-numeric text
+            # Pull out any sequences of digits…
+            num_matches = re.findall(r'\d+', part)
+            # …and any leftover letters
+            non_num_part = re.sub(r'\d+', '', part).lower()
 
-            if num_matches:
-                sort_key.extend([int(num) for num in num_matches])  # Convert numbers to integers for sorting
-            if non_num_part:
-                sort_key.append(non_num_part)  # Keep text parts in order
+            if num_matches and non_num_part:
+                # “Mixed” segment like “10RT”: first the numbers, then the letters
+                for nm in num_matches:
+                    sort_key.append((0, int(nm)))
+                sort_key.append((1, non_num_part))
+            elif num_matches:
+                # Purely numeric segment
+                for nm in num_matches:
+                    sort_key.append((0, int(nm)))
+            elif non_num_part:
+                # Purely text segment
+                sort_key.append((1, non_num_part))
 
         return tuple(sort_key)
 
@@ -95,6 +109,12 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
     :return: Filtered DataFrame with one row per dataset.
     """
     try:
+        # Ensure R.Time is numeric and drop any non-numeric entries to avoid string/int comparison errors
+        input_data["R.Time"] = pd.to_numeric(input_data["R.Time"], errors="coerce")
+        input_data = input_data.dropna(subset=["R.Time"])
+        # Ensure R.Time is numeric and drop invalid entries to avoid type comparison errors
+        input_data["R.Time"] = pd.to_numeric(input_data["R.Time"], errors="coerce")
+        input_data = input_data.dropna(subset=["R.Time"])
         if "R.Time" not in input_data.columns or "Area" not in input_data.columns:
             raise ValueError("Missing required columns: 'R.Time' or 'Area'")
 

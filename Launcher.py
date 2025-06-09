@@ -41,14 +41,14 @@ def main():
     # Step 4: Define filtering parameters (Dynamic target R.Time & compound mapping)
     logging.info("Filtering data based on target R.Time values...")
 
-    target_r_times = [2.0, 4.15, 4.4, 7.7,9.9]  # Modify this list to include more compounds
-    compound_mapping = {  # This dictionary dynamically maps R.Time to compound names
+    compound_mapping = {
         2.0: "PO",
         4.15: "2-MIPA",
         4.4: "1-MIPA",
         7.7: "Diglyme",
         9.9: "DIPA"
     }
+    target_r_times = list(compound_mapping.keys())
     tolerance = 0.1
 
     # Process and filter data
