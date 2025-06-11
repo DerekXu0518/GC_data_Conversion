@@ -21,7 +21,6 @@ def generate_hierarchy_column(data):
           - type_flag = 0 for numbers, 1 for text.
           - value = int(number) or lowercase string.
         """
-        import re
 
         parts = string.split('-')
         sort_key = []
@@ -109,9 +108,6 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
     :return: Filtered DataFrame with one row per dataset.
     """
     try:
-        # Ensure R.Time is numeric and drop any non-numeric entries to avoid string/int comparison errors
-        input_data["R.Time"] = pd.to_numeric(input_data["R.Time"], errors="coerce")
-        input_data = input_data.dropna(subset=["R.Time"])
         # Ensure R.Time is numeric and drop invalid entries to avoid type comparison errors
         input_data["R.Time"] = pd.to_numeric(input_data["R.Time"], errors="coerce")
         input_data = input_data.dropna(subset=["R.Time"])
@@ -127,8 +123,11 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
         ].copy()
 
         if filtered.empty:
-            logging.warning("No matching R.Time data found after filtering.")
-            return pd.DataFrame()
+            logging.warning("No matching R.Time… returning zeros.")
+            # use the pivot logic to build a zero‐row
+            zero_df = pd.DataFrame([{"Source File": None, **{c: 0 for c in compound_mapping.values()}}])
+            zero_df["Hierarchy"] = ()  # so subsequent sort/drop won't fail
+            return zero_df.drop(columns=["Hierarchy"])
 
         # Step 2: Assign nearest target R.Time for each filtered entry
         filtered["Target R.Time"] = filtered["R.Time"].apply(
@@ -148,21 +147,40 @@ def process_and_filter_file(input_data, target_r_times, tolerance, compound_mapp
         # **Fixing the duplicate issue**: Group by "Source File" and "Compound" to ensure unique entries
         filtered = filtered.groupby(["Source File", "Compound"], as_index=False).first()
 
-        # Step 5: Pivot table dynamically (handles any new compound names)
-        pivoted_data = filtered.pivot(index="Source File", columns="Compound", values="Area").reset_index()
+        # Merge hierarchy from input_data so that 'Hierarchy' exists in filtered
+        filtered = filtered.merge(
+            input_data[['Source File', 'Hierarchy']].drop_duplicates(),
+            on='Source File',
+            how='left'
+        )
 
-        # Step 6: Merge with hierarchy for final sorting
-        hierarchy_data = input_data[['Source File', 'Hierarchy']].drop_duplicates()
-        pivoted_data = pivoted_data.merge(hierarchy_data, on="Source File", how="left")
+        # Step 5: Create full set of source-compound pairs
+        source_files = filtered["Source File"].unique()
+        compound_names = list(compound_mapping.values())
+        all_combinations = pd.MultiIndex.from_product([source_files, compound_names], names=["Source File", "Compound"])
 
-        # Sort based on hierarchy
-        pivoted_data = pivoted_data.sort_values(by=["Hierarchy"], ascending=True)
+        # Set index for filtered to prepare for reindexing
+        filtered.set_index(["Source File", "Compound"], inplace=True)
+        filtered = filtered.reindex(all_combinations, fill_value=0).reset_index()
 
-        # **Final Fix:** Remove duplicates again just in case
-        pivoted_data = pivoted_data.drop_duplicates(subset=["Source File"])
+        # Merge hierarchy again after reindex
+        filtered = filtered.merge(
+            input_data[['Source File', 'Hierarchy']].drop_duplicates(),
+            on='Source File',
+            how='left'
+        )
 
-        # Remove the hierarchy column before exporting
-        return pivoted_data.drop(columns=["Hierarchy"], errors="ignore")
+        # Pivot the table with all expected compounds
+        pivoted_data = filtered.pivot_table(
+            index=["Source File", "Hierarchy"],
+            columns="Compound",
+            values="Area",
+            aggfunc="first",
+            fill_value=0
+        ).reset_index()
+
+        # Sort based on hierarchy and remove the hierarchy column before exporting
+        return pivoted_data.sort_values(by=["Hierarchy"], ascending=True).drop(columns=["Hierarchy"], errors="ignore")
 
     except Exception as e:
         logging.error(f"Error filtering and restructuring data: {e}")
